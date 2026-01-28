@@ -1,0 +1,29 @@
+[
+  {
+    "id": "athana",
+    "pos": "v.tr.",
+    "definition": "to rule over, to govern.",
+    "example_k": "Atiūmba kwathana miaka itano",
+    "example_e": "he will not be able to govern for five years.",
+    "cross_refs": [],
+    "timestamp": 1737571325
+  },
+  {
+    "id": "baicikiri",
+    "pos": "n.",
+    "definition": "bicycle.",
+    "example_k": null,
+    "example_e": null,
+    "cross_refs": [],
+    "timestamp": 1737571325
+  },
+  {
+    "id": "athara",
+    "pos": "n.",
+    "definition": "loss, detriment, damage.",
+    "example_k": null,
+    "example_e": null,
+    "cross_refs": ["acaara"],
+    "timestamp": 1737571325
+  }
+]
