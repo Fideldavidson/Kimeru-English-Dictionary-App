@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/dictionary_entry.dart';
+import 'github_sync_service.dart';
 
 class LocalDatabaseService {
   static final LocalDatabaseService _instance = LocalDatabaseService._internal();
@@ -136,5 +137,18 @@ class LocalDatabaseService {
     return List.generate(maps.length, (i) {
       return DictionaryEntry.fromMap(maps[i]);
     });
+  }
+
+  /// Syncs the local database with the remote GitHub repository.
+  /// Returns the number of entries updated.
+  Future<int> syncWithRemote() async {
+    final GitHubSyncService syncService = GitHubSyncService();
+    final entries = await syncService.fetchLatestDictionary();
+    
+    if (entries.isNotEmpty) {
+      await insertOrUpdateEntries(entries);
+    }
+    
+    return entries.length;
   }
 }

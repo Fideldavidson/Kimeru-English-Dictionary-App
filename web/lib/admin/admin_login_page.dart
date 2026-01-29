@@ -66,8 +66,9 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
                 controller: _passwordController,
                 obscureText: true,
                 decoration: InputDecoration(
-                  labelText: 'Admin Password',
-                  errorText: _error ? 'Incorrect password' : null,
+                  labelText: 'GitHub Personal Access Token',
+                  hintText: 'ghp_...',
+                  errorText: _error ? 'Invalid token' : null,
                   border: const OutlineInputBorder(),
                 ),
                 onSubmitted: (_) => _handleLogin(),

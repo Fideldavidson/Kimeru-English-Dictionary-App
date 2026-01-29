@@ -1,0 +1,13 @@
+// GitHub Configuration
+// This file should be .gitignored and never committed to version control.
+// Copy this file to github_config.dart and fill in your real values.
+
+class GitHubConfig {
+  static const String owner = 'Fideldavidson';
+  static const String repo = 'Kimeru-English-Dictionary-App';
+  static const String path = 'data/dictionary.json';
+  
+  // IMPORTANT: Replace this with your actual GitHub PAT
+  // Generate one at: Settings -> Developer settings -> Personal access tokens
+  static const String token = 'YOUR_GITHUB_PAT_HERE';
+}

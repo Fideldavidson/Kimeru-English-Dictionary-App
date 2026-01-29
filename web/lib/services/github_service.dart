@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/dictionary_entry.dart';
+import '../config/github_config.dart';
 
 class GitHubService {
   final String owner;
@@ -9,21 +10,30 @@ class GitHubService {
   final String token;
 
   GitHubService({
-    required this.owner,
-    required this.repo,
-    required this.path,
-    required this.token,
-  });
+    String? owner,
+    String? repo,
+    String? path,
+    String? token,
+  }) : 
+    owner = owner ?? GitHubConfig.owner,
+    repo = repo ?? GitHubConfig.repo,
+    path = path ?? GitHubConfig.path,
+    token = token ?? GitHubConfig.token;
 
   String get _baseUrl => 'https://api.github.com/repos/$owner/$repo/contents/$path';
 
   Future<Map<String, dynamic>> fetchFileMetadata() async {
+    final headers = {
+      'Accept': 'application/vnd.github.v3+json',
+    };
+    
+    if (token != 'YOUR_GITHUB_PAT_HERE' && token.isNotEmpty) {
+      headers['Authorization'] = 'token $token';
+    }
+
     final response = await http.get(
       Uri.parse(_baseUrl),
-      headers: {
-        'Authorization': 'token $token',
-        'Accept': 'application/vnd.github.v3+json',
-      },
+      headers: headers,
     );
 
     if (response.statusCode == 200) {

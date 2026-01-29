@@ -22,6 +22,19 @@ class _ReviewQueuePageState extends State<ReviewQueuePage> {
   final PDFParserService _parserService = PDFParserService();
   List<DictionaryEntry> _stagedEntries = [];
   bool _isParsing = false;
+  int _currentPage = 0;
+  final int _pageSize = 10;
+
+  int get _totalPages => (_stagedEntries.length / _pageSize).ceil();
+  
+  List<DictionaryEntry> get _visibleEntries {
+    if (_stagedEntries.isEmpty) return [];
+    final start = _currentPage * _pageSize;
+    final end = (start + _pageSize) > _stagedEntries.length 
+        ? _stagedEntries.length 
+        : (start + _pageSize);
+    return _stagedEntries.sublist(start, end);
+  }
 
   void _parseText() {
     if (_ocrController.text.isEmpty) return;
@@ -32,6 +45,7 @@ class _ReviewQueuePageState extends State<ReviewQueuePage> {
       setState(() {
         _stagedEntries = [...newEntries, ..._stagedEntries];
         _isParsing = false;
+        _currentPage = 0; // Reset to page 1 on new parse
         _ocrController.clear();
       });
       ScaffoldMessenger.of(context).showSnackBar(
@@ -45,22 +59,28 @@ class _ReviewQueuePageState extends State<ReviewQueuePage> {
     }
   }
 
-  void _editEntry(int index) async {
+  void _editEntry(int relativeIndex) async {
+    final absoluteIndex = _currentPage * _pageSize + relativeIndex;
     final result = await showDialog<DictionaryEntry>(
       context: context,
-      builder: (context) => WordEditorDialog(entry: _stagedEntries[index]),
+      builder: (context) => WordEditorDialog(entry: _stagedEntries[absoluteIndex]),
     );
 
     if (result != null) {
       setState(() {
-        _stagedEntries[index] = result;
+        _stagedEntries[absoluteIndex] = result;
       });
     }
   }
 
-  void _removeEntry(int index) {
+  void _removeEntry(int relativeIndex) {
+    final absoluteIndex = _currentPage * _pageSize + relativeIndex;
     setState(() {
-      _stagedEntries.removeAt(index);
+      _stagedEntries.removeAt(absoluteIndex);
+      // Adjust page if it became empty
+      if (_currentPage >= _totalPages && _currentPage > 0) {
+        _currentPage--;
+      }
     });
   }
 
@@ -173,10 +193,20 @@ class _ReviewQueuePageState extends State<ReviewQueuePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                   Text(
-                    '2. Review Staged Entries (${_stagedEntries.length})',
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1A5F7A)),
-                  ),
+                   Row(
+                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                     children: [
+                       Text(
+                        '2. Review Staged Entries (${_stagedEntries.length})',
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1A5F7A)),
+                      ),
+                      if (_totalPages > 1)
+                        Text(
+                          'Page ${_currentPage + 1} of $_totalPages',
+                          style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                        ),
+                     ],
+                   ),
                   const SizedBox(height: 16),
                   Expanded(
                     child: _stagedEntries.isEmpty
@@ -190,83 +220,112 @@ class _ReviewQueuePageState extends State<ReviewQueuePage> {
                               ],
                             ),
                           )
-                        : ListView.separated(
-                            itemCount: _stagedEntries.length,
-                            separatorBuilder: (context, index) => const SizedBox(height: 12),
-                            itemBuilder: (context, index) {
-                              final entry = _stagedEntries[index];
-                              final hasErrors = entry.definitions.isEmpty;
+                        : Column(
+                            children: [
+                              Expanded(
+                                child: ListView.separated(
+                                  itemCount: _visibleEntries.length,
+                                  separatorBuilder: (context, index) => const SizedBox(height: 12),
+                                  itemBuilder: (context, index) {
+                                    final entry = _visibleEntries[index];
+                                    final hasErrors = entry.definitions.isEmpty;
 
-                              return Card(
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  side: BorderSide(
-                                    color: hasErrors ? Colors.red.withOpacity(0.5) : Colors.grey[200]!,
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(16),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Text(
-                                            entry.id,
-                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                            decoration: BoxDecoration(
-                                              color: Colors.teal[50],
-                                              borderRadius: BorderRadius.circular(4),
-                                            ),
-                                            child: Text(
-                                              entry.pos,
-                                              style: TextStyle(color: Colors.teal[800], fontSize: 11, fontWeight: FontWeight.bold),
-                                            ),
-                                          ),
-                                          const Spacer(),
-                                          if (hasErrors)
-                                            const Tooltip(
-                                              message: 'Missing definitions!',
-                                              child: Icon(Icons.warning_amber_rounded, color: Colors.red, size: 20),
-                                            ),
-                                          IconButton(
-                                            icon: const Icon(Icons.edit, size: 20, color: Color(0xFF1A5F7A)),
-                                            onPressed: () => _editEntry(index),
-                                          ),
-                                          IconButton(
-                                            icon: const Icon(Icons.delete_outline, size: 20, color: Colors.redAccent),
-                                            onPressed: () => _removeEntry(index),
-                                          ),
-                                        ],
-                                      ),
-                                      const Divider(),
-                                      Text(
-                                        entry.definitions.isEmpty 
-                                            ? '⚠️ No definition extracted' 
-                                            : entry.definitions.join('; '),
-                                        style: TextStyle(
-                                          color: entry.definitions.isEmpty ? Colors.red : Colors.black87,
-                                          fontSize: 14,
+                                    return Card(
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        side: BorderSide(
+                                          color: hasErrors ? Colors.red.withOpacity(0.5) : Colors.grey[200]!,
+                                          width: 1,
                                         ),
                                       ),
-                                      if (entry.examples.isNotEmpty) ...[
-                                        const SizedBox(height: 8),
-                                        Text(
-                                          'Example: ${entry.examples.first.kimeru}',
-                                          style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(16),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Text(
+                                                  entry.id,
+                                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.teal[50],
+                                                    borderRadius: BorderRadius.circular(4),
+                                                  ),
+                                                  child: Text(
+                                                    entry.pos,
+                                                    style: TextStyle(color: Colors.teal[800], fontSize: 11, fontWeight: FontWeight.bold),
+                                                  ),
+                                                ),
+                                                const Spacer(),
+                                                if (hasErrors)
+                                                  const Tooltip(
+                                                    message: 'Missing definitions!',
+                                                    child: Icon(Icons.warning_amber_rounded, color: Colors.red, size: 20),
+                                                  ),
+                                                IconButton(
+                                                  icon: const Icon(Icons.edit, size: 20, color: Color(0xFF1A5F7A)),
+                                                  onPressed: () => _editEntry(index),
+                                                ),
+                                                IconButton(
+                                                  icon: const Icon(Icons.delete_outline, size: 20, color: Colors.redAccent),
+                                                  onPressed: () => _removeEntry(index),
+                                                ),
+                                              ],
+                                            ),
+                                            const Divider(),
+                                            Text(
+                                              entry.definitions.isEmpty 
+                                                  ? '⚠️ No definition extracted' 
+                                                  : entry.definitions.join('; '),
+                                              style: TextStyle(
+                                                color: entry.definitions.isEmpty ? Colors.red : Colors.black87,
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                            if (entry.examples.isNotEmpty) ...[
+                                              const SizedBox(height: 8),
+                                              Text(
+                                                'Example: ${entry.examples.first.kimeru}',
+                                                style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+                                              ),
+                                            ],
+                                          ],
                                         ),
-                                      ],
-                                    ],
-                                  ),
+                                      ),
+                                    );
+                                  },
                                 ),
-                              );
-                            },
+                              ),
+                              if (_totalPages > 1) ...[
+                                const SizedBox(height: 16),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    IconButton(
+                                      onPressed: _currentPage > 0 
+                                          ? () => setState(() => _currentPage--) 
+                                          : null,
+                                      icon: const Icon(Icons.arrow_back_ios, size: 16),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    Text('Page ${_currentPage + 1} of $_totalPages'),
+                                    const SizedBox(width: 16),
+                                    IconButton(
+                                      onPressed: _currentPage < _totalPages - 1 
+                                          ? () => setState(() => _currentPage++) 
+                                          : null,
+                                      icon: const Icon(Icons.arrow_forward_ios, size: 16),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ],
                           ),
                   ),
                 ],

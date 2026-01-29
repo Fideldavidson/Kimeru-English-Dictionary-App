@@ -5,6 +5,7 @@ import '../widgets/meru_character_bar.dart';
 import '../widgets/word_of_day_card.dart';
 import '../widgets/category_filter_bar.dart';
 import 'word_detail_screen.dart';
+import 'settings_screen.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -111,7 +112,12 @@ class _SearchScreenState extends State<SearchScreen> {
                   ),
                   IconButton(
                     icon: const Icon(Icons.settings, color: Colors.black87),
-                    onPressed: () {},
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                      );
+                    },
                   ),
                 ],
               ),
