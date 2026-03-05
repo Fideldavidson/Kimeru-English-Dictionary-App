@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import '../models/dictionary_entry.dart';
 import '../services/local_database_service.dart';
 import '../widgets/meru_character_bar.dart';
-import '../widgets/word_of_day_card.dart';
-import '../widgets/category_filter_bar.dart';
+import '../widgets/mugwe_card.dart';
+import '../widgets/google_loader.dart';
 import 'word_detail_screen.dart';
 import 'settings_screen.dart';
 
@@ -21,18 +21,6 @@ class _SearchScreenState extends State<SearchScreen> {
   List<DictionaryEntry> _recentWords = [];
   bool _isLoading = false;
   bool _isSearching = false;
-
-  // Placeholder for "Word of the Day" - To be replaced with dynamic content later
-  final DictionaryEntry _mockWOTD = DictionaryEntry(
-    id: "Mugwe",
-    pos: "noun",
-    definitions: ["A religious leader or prophet within the traditional Meru spiritual structure, serving as a mediator between God and the people."],
-    examples: [
-      DictionaryExample(kimeru: "Mugwe niwe wambiriirie guthoma.", english: "The Mugwe was the one who started the prayer.")
-    ],
-    cf: "Njuri Ncheke",
-    timestamp: 1737571325,
-  );
 
   @override
   void initState() {
@@ -91,8 +79,9 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
-      backgroundColor: Colors.white,
       body: SafeArea(
         child: Column(
           children: [
@@ -102,16 +91,15 @@ class _SearchScreenState extends State<SearchScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
+                  Text(
                     'Kimeru',
-                    style: TextStyle(
-                      fontSize: 28,
+                    style: theme.textTheme.displaySmall?.copyWith(
                       fontWeight: FontWeight.bold,
-                      letterSpacing: -0.5,
+                      color: theme.colorScheme.primary,
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.settings, color: Colors.black87),
+                    icon: Icon(Icons.settings, color: theme.colorScheme.onSurface),
                     onPressed: () {
                       Navigator.push(
                         context,
@@ -128,11 +116,12 @@ class _SearchScreenState extends State<SearchScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
               child: TextField(
                 controller: _searchController,
+                style: theme.textTheme.bodyLarge,
                 decoration: InputDecoration(
                   hintText: 'Search Kimeru or English...',
-                  prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                  prefixIcon: const Icon(Icons.search),
                   filled: true,
-                  fillColor: Colors.grey[100],
+                  fillColor: theme.colorScheme.surfaceVariant,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
                     borderSide: BorderSide.none,
@@ -146,7 +135,7 @@ class _SearchScreenState extends State<SearchScreen> {
               child: _isSearching ? _buildSearchResults() : _buildHomeScreen(),
             ),
 
-            // Meru Character Bar (Only shown when searching/keyboard is likely up)
+            // Meru Character Bar
             MeruCharacterBar(
               controller: _searchController,
               onCharacterPressed: _onSearchChanged,
@@ -158,134 +147,91 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildHomeScreen() {
+    final theme = Theme.of(context);
+    
     return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
       children: [
-        const SizedBox(height: 16),
-        WordOfTheDayCard(
-          entry: _mockWOTD,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => WordDetailScreen(entry: _mockWOTD)),
-          ),
-        ),
+        const MugweCard(),
         const SizedBox(height: 24),
-        CategoryFilterBar(
-          categories: const ['All', 'Nouns', 'Verbs', 'Proverbs'],
-          onSelected: (cat) {},
-        ),
-        const SizedBox(height: 32),
-        const Text(
-          'RECENT WORDS', // Effectively "Discover" for now
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: Colors.grey,
-            letterSpacing: 1.2,
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
+            'DISCOVER',
+            style: theme.textTheme.labelSmall?.copyWith(
+              letterSpacing: 1.2,
+              fontWeight: FontWeight.bold,
+              color: theme.colorScheme.secondary,
+            ),
           ),
         ),
         const SizedBox(height: 16),
         if (_recentWords.isEmpty)
-          const Center(child: Padding(
-            padding: EdgeInsets.all(16.0),
-            child: CircularProgressIndicator(),
-          ))
+          const GoogleLoader()
         else
-          ..._recentWords.map((entry) => _buildRecentItem(
-            entry.id, 
-            entry.pos, 
-            entry.definitions.isNotEmpty ? entry.definitions.first : '',
-            entry: entry
-          )).toList(),
-        const SizedBox(height: 24),
+          ..._recentWords.map((entry) => _buildResultItem(entry)).toList(),
       ],
     );
   }
 
   Widget _buildSearchResults() {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const GoogleLoader();
     }
     if (_results.isEmpty) {
       return const Center(child: Text('No results found'));
     }
 
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       itemCount: _results.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        final entry = _results[index];
-        return _buildRecentItem(
-          entry.id, 
-          entry.pos, 
-          entry.definitions.isNotEmpty ? entry.definitions.first : '', 
-          entry: entry
-        );
-      },
+      itemBuilder: (context, index) => _buildResultItem(_results[index]),
     );
   }
 
-  Widget _buildRecentItem(String title, String pos, String snippet, {DictionaryEntry? entry}) {
+  Widget _buildResultItem(DictionaryEntry entry) {
+    final theme = Theme.of(context);
+    
     return Card(
       elevation: 0,
-      color: Colors.grey[50],
+      margin: const EdgeInsets.only(bottom: 8),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.grey[100]!),
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
       ),
-      child: InkWell(
+      child: ListTile(
+        contentPadding: const EdgeInsets.all(16),
         onTap: () {
-          if (entry != null) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => WordDetailScreen(entry: entry)),
-            );
-          }
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => WordDetailScreen(entry: entry)),
+          );
         },
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          title,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          pos,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontStyle: FontStyle.italic,
-                            color: Colors.teal,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      snippet,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: Colors.grey[600]),
-                    ),
-                  ],
-                ),
+        title: Row(
+          children: [
+            Text(
+              entry.id,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
               ),
-              const Icon(Icons.chevron_right, color: Colors.grey),
-            ],
-          ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              entry.pos,
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontStyle: FontStyle.italic,
+                color: theme.colorScheme.secondary,
+              ),
+            ),
+          ],
         ),
+        subtitle: Text(
+          entry.definitions.isNotEmpty ? entry.definitions.first : '',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.bodyMedium,
+        ),
+        trailing: const Icon(Icons.chevron_right),
       ),
     );
   }

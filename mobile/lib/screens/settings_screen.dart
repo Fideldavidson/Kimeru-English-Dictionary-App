@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
+import '../providers/settings_provider.dart';
 import '../services/local_database_service.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -12,25 +13,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final LocalDatabaseService _dbService = LocalDatabaseService();
   bool _isSyncing = false;
-  String? _lastSyncTime;
   String? _syncMessage;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadLastSyncTime();
-  }
-
-  Future<void> _loadLastSyncTime() async {
-    final prefs = await SharedPreferences.getInstance();
-    final timestamp = prefs.getInt('last_sync_timestamp');
-    if (timestamp != null) {
-      final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
-      setState(() {
-        _lastSyncTime = '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
-      });
-    }
-  }
 
   Future<void> _handleSync() async {
     setState(() {
@@ -40,13 +23,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     try {
       final count = await _dbService.syncWithRemote();
-      
-      // Save sync timestamp
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt('last_sync_timestamp', DateTime.now().millisecondsSinceEpoch);
-      
-      await _loadLastSyncTime();
-      
       setState(() {
         _syncMessage = count > 0 
             ? 'Successfully synced $count words!' 
@@ -63,134 +39,101 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final settings = context.watch<SettingsProvider>();
+
     return Scaffold(
-      backgroundColor: const Color(0xFF0A1628),
       appBar: AppBar(
         title: const Text('Settings'),
-        backgroundColor: const Color(0xFF0A1628),
-        elevation: 0,
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // Sync Section
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1A2942),
-              borderRadius: BorderRadius.circular(12),
-            ),
+          _buildSectionTitle(context, 'Appearance'),
+          Card(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Dictionary Sync',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                SwitchListTile(
+                  title: const Text('Dark Mode'),
+                  subtitle: const Text('Switch between light and dark themes'),
+                  value: settings.isDarkMode,
+                  onChanged: (value) => settings.toggleTheme(value),
+                  secondary: const Icon(Icons.brightness_4),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  title: const Text('Font Size'),
+                  subtitle: Text('Current scale: ${settings.fontSizeMultiplier.toStringAsFixed(1)}x'),
+                  leading: const Icon(Icons.format_size),
+                  trailing: DropdownButton<double>(
+                    value: settings.fontSizeMultiplier,
+                    items: const [
+                      DropdownMenuItem(value: 0.8, child: Text('Small')),
+                      DropdownMenuItem(value: 1.0, child: Text('Medium')),
+                      DropdownMenuItem(value: 1.2, child: Text('Large')),
+                      DropdownMenuItem(value: 1.4, child: Text('Extra Large')),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) settings.setFontSizeMultiplier(value);
+                    },
                   ),
                 ),
-                const SizedBox(height: 12),
-                if (_lastSyncTime != null)
-                  Text(
-                    'Last synced: $_lastSyncTime',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.7),
-                      fontSize: 14,
-                    ),
-                  ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: _isSyncing ? null : _handleSync,
-                    icon: _isSyncing
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Icon(Icons.sync),
-                    label: Text(_isSyncing ? 'Syncing...' : 'Check for Updates'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF00BFA5),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 24),
+          _buildSectionTitle(context, 'Data & Sync'),
+          Card(
+            child: Column(
+              children: [
+                ListTile(
+                  title: const Text('Sync Dictionary'),
+                  subtitle: const Text('Check for updates from GitHub'),
+                  leading: const Icon(Icons.sync),
+                  trailing: _isSyncing 
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.chevron_right),
+                  onTap: _isSyncing ? null : _handleSync,
                 ),
-                if (_syncMessage != null) ...[
-                  const SizedBox(height: 12),
-                  Container(
+                if (_syncMessage != null)
+                  Padding(
                     padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: _syncMessage!.contains('failed')
-                          ? Colors.red.withOpacity(0.2)
-                          : Colors.green.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
                     child: Text(
                       _syncMessage!,
                       style: TextStyle(
-                        color: _syncMessage!.contains('failed')
-                            ? Colors.red[300]
-                            : Colors.green[300],
-                        fontSize: 14,
+                        color: _syncMessage!.contains('failed') ? Colors.red : Colors.green,
+                        fontSize: 12,
                       ),
                     ),
                   ),
-                ],
               ],
             ),
           ),
           
           const SizedBox(height: 24),
-          
-          // About Section
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1A2942),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'About',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Kimeru Dictionary v1.0.0',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.7),
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'A digital dictionary for the Kimeru language',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.5),
-                    fontSize: 12,
-                  ),
-                ),
-              ],
+          _buildSectionTitle(context, 'About'),
+          const Card(
+            child: ListTile(
+              title: Text('Kimeru Dictionary'),
+              subtitle: Text('Version 1.1.0 (Senior Build)'),
+              leading: Icon(Icons.info_outline),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(BuildContext context, String title) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, bottom: 8),
+      child: Text(
+        title.toUpperCase(),
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          letterSpacing: 1.2,
+          fontWeight: FontWeight.bold,
+          color: Theme.of(context).colorScheme.primary,
+        ),
       ),
     );
   }

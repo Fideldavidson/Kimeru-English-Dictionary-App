@@ -1,18 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'config/app_theme.dart';
+import 'providers/settings_provider.dart';
+import 'providers/word_provider.dart';
+import 'screens/splash_screen.dart';
 import 'screens/search_screen.dart';
-import 'utils/data_seeder.dart';
+import 'screens/settings_screen.dart';
 
 void main() async {
-  try {
-    WidgetsFlutterBinding.ensureInitialized();
-    
-    // Seed the database with expanded dataset (only if empty)
-    await DataSeeder.seed();
-  } catch (e) {
-    debugPrint("Initialization error: $e");
-  }
-
-  runApp(const KimeruDictionaryApp());
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => SettingsProvider()),
+        ChangeNotifierProvider(create: (_) => WordProvider()),
+      ],
+      child: const KimeruDictionaryApp(),
+    ),
+  );
 }
 
 class KimeruDictionaryApp extends StatelessWidget {
@@ -20,23 +26,17 @@ class KimeruDictionaryApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Kimeru Dictionary',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF04362F),
-          primary: const Color(0xFF04362F),
-        ),
-        scaffoldBackgroundColor: Colors.white,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.white,
-          foregroundColor: Colors.black,
-          elevation: 0,
-        ),
-      ),
-      home: const MainScaffold(),
+    return Consumer<SettingsProvider>(
+      builder: (context, settings, child) {
+        return MaterialApp(
+          title: 'Kimeru Dictionary',
+          debugShowCheckedModeBanner: false,
+          themeMode: settings.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+          theme: AppTheme.lightTheme(settings.fontSizeMultiplier),
+          darkTheme: AppTheme.darkTheme(settings.fontSizeMultiplier),
+          home: const SplashScreen(),
+        );
+      },
     );
   }
 }
@@ -55,7 +55,7 @@ class _MainScaffoldState extends State<MainScaffold> {
     const SearchScreen(),
     const PlaceholderScreen(title: 'Saved Words'),
     const PlaceholderScreen(title: 'History'),
-    const PlaceholderScreen(title: 'Settings'),
+    const SettingsScreen(),
   ];
 
   @override
@@ -69,13 +69,13 @@ class _MainScaffoldState extends State<MainScaffold> {
         currentIndex: _currentIndex,
         onTap: (index) => setState(() => _currentIndex = index),
         type: BottomNavigationBarType.fixed,
-        selectedItemColor: const Color(0xFF0D9D8B),
+        selectedItemColor: AppTheme.primaryColor,
         unselectedItemColor: Colors.grey,
         showUnselectedLabels: true,
         selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
         unselectedLabelStyle: const TextStyle(fontSize: 12),
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home_filled), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Search'),
           BottomNavigationBarItem(icon: Icon(Icons.bookmark), label: 'Saved'),
           BottomNavigationBarItem(icon: Icon(Icons.history), label: 'History'),
           BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Settings'),
